@@ -1,22 +1,22 @@
 <#
 .SYNOPSIS
-    Generates Copilot license invoices per department from an AD group.
+    Genererer Copilot-lisens fakturaer per avdeling fra en AD-gruppe.
 
 .DESCRIPTION
-    Reads members of a specified AD group, groups them by Department,
-    and generates one Excel invoice per department. Price is 3500 kr per member.
+    Leser medlemmer av en angitt AD-gruppe, grupperer dem etter avdeling,
+    og genererer én Excel-faktura per avdeling. Pris er 3500 kr per medlem.
 
 .PARAMETER GroupName
-    The name of the AD group to query.
+    Navnet på AD-gruppen som skal hentes.
 
 .PARAMETER OutputFolder
-    Folder where invoice Excel files are saved. Defaults to .\Invoices.
+    Mappe der faktura-filer lagres.
 
 .PARAMETER InvoiceNumberStart
-    Starting invoice number. Each department gets the next sequential number.
+    Startnummer for fakturanummerering. Hver avdeling får neste ledige nummer.
 
 .PARAMETER InvoiceDate
-    Invoice date. Defaults to today.
+    Fakturadato. Standardverdi er dagens dato.
 
 .EXAMPLE
     .\Generate-CopilotInvoices.ps1
@@ -39,22 +39,22 @@ param(
     [decimal]$PricePerUnit       = 3500
 )
 
-#region --- Dependency check ---
+#region --- Sjekk avhengigheter ---
 if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
-    Write-Host "ImportExcel module not found. Installing..." -ForegroundColor Yellow
+    Write-Host "ImportExcel-modulen ble ikke funnet. Installerer..." -ForegroundColor Yellow
     Install-Module ImportExcel -Scope CurrentUser -Force -ErrorAction Stop
 }
 Import-Module ImportExcel -ErrorAction Stop
 
 if (-not (Get-Module -ListAvailable -Name ActiveDirectory)) {
-    Write-Error "ActiveDirectory module is not available. Install RSAT or run this on a domain-joined machine with AD tools."
+    Write-Error "ActiveDirectory-modulen er ikke tilgjengelig. Installer RSAT eller kjør skriptet på en domenetilkoblet maskin."
     exit 1
 }
 Import-Module ActiveDirectory -ErrorAction Stop
 #endregion
 
-#region --- Fetch AD group members ---
-Write-Host "Querying AD group: '$GroupName'..." -ForegroundColor Cyan
+#region --- Hent medlemmer fra AD-gruppe ---
+Write-Host "Henter medlemmer fra AD-gruppe: '$GroupName'..." -ForegroundColor Cyan
 
 try {
     $members = Get-ADGroupMember -Identity $GroupName -Recursive |
@@ -63,35 +63,35 @@ try {
             Get-ADUser -Identity $_.SamAccountName -Properties DisplayName, Department, departmentNumber, Title, EmailAddress
         }
 } catch {
-    Write-Error "Failed to query AD group '$GroupName': $_"
+    Write-Error "Kunne ikke hente AD-gruppe '$GroupName': $_"
     exit 1
 }
 
 if (-not $members) {
-    Write-Warning "No user members found in group '$GroupName'."
+    Write-Warning "Ingen brukere funnet i gruppen '$GroupName'."
     exit 0
 }
 
-Write-Host "Found $($members.Count) member(s)." -ForegroundColor Green
+Write-Host "Fant $($members.Count) bruker(e)." -ForegroundColor Green
 #endregion
 
-#region --- Group by department ---
+#region --- Grupper etter avdeling ---
 $byDepartment = $members | Group-Object {
-    if ($_.Department) { $_.Department.Trim() } else { "Unknown" }
+    if ($_.Department) { $_.Department.Trim() } else { "Ukjent" }
 } | Sort-Object Name
 
-Write-Host "Departments found: $($byDepartment.Count)" -ForegroundColor Cyan
-$byDepartment | ForEach-Object { Write-Host "  - $($_.Name): $($_.Count) user(s)" }
+Write-Host "Antall avdelinger: $($byDepartment.Count)" -ForegroundColor Cyan
+$byDepartment | ForEach-Object { Write-Host "  - $($_.Name): $($_.Count) bruker(e)" }
 #endregion
 
-#region --- Create output folder ---
+#region --- Opprett mappe for fakturaer ---
 if (-not (Test-Path $OutputFolder)) {
     New-Item -ItemType Directory -Path $OutputFolder | Out-Null
 }
 $OutputFolder = (Resolve-Path $OutputFolder).Path
 #endregion
 
-#region --- Generate one Excel invoice per department ---
+#region --- Generer én Excel-faktura per avdeling ---
 $invoiceNumber = $InvoiceNumberStart
 
 foreach ($dept in $byDepartment) {
@@ -100,7 +100,7 @@ foreach ($dept in $byDepartment) {
     $quantity    = $users.Count
     $totalAmount = $quantity * $PricePerUnit
 
-    # Try to get department number from first user's departmentNumber attribute
+    # Hent avdelingsnummer fra første bruker med utfylt departmentNumber
     $deptNumber = ($users | Where-Object { $_.departmentNumber } | Select-Object -First 1).departmentNumber
     if (-not $deptNumber) { $deptNumber = "" }
 
@@ -108,12 +108,12 @@ foreach ($dept in $byDepartment) {
     $safeDept    = $deptName -replace '[\\/:*?"<>|]', '_'
     $outFile     = Join-Path $OutputFolder "$invNumStr`_$safeDept.xlsx"
 
-    # ---- Build Excel workbook ----
+    # ---- Bygg Excel-arbeidsbok ----
     $xl = Open-ExcelPackage -Path $outFile -KillExcel
 
     $ws = Add-Worksheet -ExcelPackage $xl -WorksheetName "Faktura"
 
-    # Helper: write a cell value and optional bold/style
+    # Hjelpefunksjon: skriv verdi til celle med valgfri formatering
     function Set-Cell {
         param($sheet, $row, $col, $value, [switch]$Bold, [switch]$Right)
         $sheet.Cells[$row, $col].Value = $value
@@ -121,7 +121,7 @@ foreach ($dept in $byDepartment) {
         if ($Right) { $sheet.Cells[$row, $col].Style.HorizontalAlignment = [OfficeOpenXml.Style.ExcelHorizontalAlignment]::Right }
     }
 
-    # --- Header block ---
+    # --- Topptekst ---
     Set-Cell $ws 1 1 $SellerName -Bold
     Set-Cell $ws 2 1 "Org.nr: $SellerOrgNr"
     Set-Cell $ws 4 1 "FAKTURA" -Bold
@@ -131,19 +131,19 @@ foreach ($dept in $byDepartment) {
     Set-Cell $ws 6 2 $invNumStr
     Set-Cell $ws 7 1 "Fakturadato:"    -Bold
     Set-Cell $ws 7 2 ($InvoiceDate.ToString("yyyy-MM-dd"))
-    Set-Cell $ws 8 1 "Forfall:"        -Bold
+    Set-Cell $ws 8 1 "Forfallsdato:"   -Bold
     Set-Cell $ws 8 2 ($InvoiceDate.AddDays(30).ToString("yyyy-MM-dd"))
 
-    # --- Bill-to block ---
+    # --- Faktureres til ---
     Set-Cell $ws 6 5 "Faktureres til:"  -Bold
     Set-Cell $ws 7 5 $deptName
     if ($deptNumber) {
         Set-Cell $ws 8 5 "Avd.nr: $deptNumber"
     }
 
-    # --- Line-items header (row 11) ---
+    # --- Kolonneoverskrifter (rad 11) ---
     $tableStart = 11
-    $headers = @("Beskrivelse", "Bruker", "E-post", "Tittel")
+    $headers = @("Beskrivelse", "Bruker", "E-postadresse", "Stilling")
     for ($c = 1; $c -le $headers.Count; $c++) {
         Set-Cell $ws $tableStart $c $headers[$c - 1] -Bold
         $ws.Cells[$tableStart, $c].Style.Fill.PatternType = [OfficeOpenXml.Style.ExcelFillStyle]::Solid
@@ -151,7 +151,7 @@ foreach ($dept in $byDepartment) {
         $ws.Cells[$tableStart, $c].Style.Font.Color.SetColor([System.Drawing.Color]::White)
     }
 
-    # --- User rows ---
+    # --- Brukerrader ---
     $row = $tableStart + 1
     foreach ($user in $users) {
         $ws.Cells[$row, 1].Value = $Product
@@ -159,7 +159,7 @@ foreach ($dept in $byDepartment) {
         $ws.Cells[$row, 3].Value = $user.EmailAddress
         $ws.Cells[$row, 4].Value = $user.Title
 
-        # Alternate row shading
+        # Annenhver rad får lys bakgrunn
         if ($row % 2 -eq 0) {
             for ($c = 1; $c -le 4; $c++) {
                 $ws.Cells[$row, $c].Style.Fill.PatternType = [OfficeOpenXml.Style.ExcelFillStyle]::Solid
@@ -169,7 +169,7 @@ foreach ($dept in $byDepartment) {
         $row++
     }
 
-    # --- Summary block ---
+    # --- Oppsummering ---
     $summaryRow = $row + 1
     Set-Cell $ws $summaryRow 1 "Antall lisenser:"   -Bold
     Set-Cell $ws $summaryRow 2 $quantity
@@ -180,32 +180,32 @@ foreach ($dept in $byDepartment) {
     $ws.Cells[$summaryRow, 2].Style.Numberformat.Format = "#,##0 kr"
 
     $summaryRow++
-    Set-Cell $ws $summaryRow 1 "Total eks. mva.:"   -Bold
+    Set-Cell $ws $summaryRow 1 "Totalt eks. mva.:"  -Bold
     $ws.Cells[$summaryRow, 2].Value = $totalAmount
     $ws.Cells[$summaryRow, 2].Style.Numberformat.Format = "#,##0 kr"
     $ws.Cells[$summaryRow, 2].Style.Font.Bold = $true
     $ws.Cells[$summaryRow, 2].Style.Font.Size = 13
 
-    # Thin border around summary
+    # Tynn kant rundt oppsummeringsblokken
     $sumRange = $ws.Cells[$summaryRow - 2, 1, $summaryRow, 2]
     $sumRange.Style.Border.BorderAround([OfficeOpenXml.Style.ExcelBorderStyle]::Thin)
 
-    # --- Column widths ---
+    # --- Kolonnebredder ---
     $ws.Column(1).Width = 42
     $ws.Column(2).Width = 30
     $ws.Column(3).Width = 34
     $ws.Column(4).Width = 28
     $ws.Column(5).Width = 22
 
-    # --- Freeze top rows and add a thin border under the header row ---
+    # --- Frys øverste rader ---
     $ws.View.FreezePanes($tableStart + 1, 1)
 
     Close-ExcelPackage $xl -Show:$false
 
-    Write-Host "Created: $outFile  ($quantity users, total $('{0:N0}' -f $totalAmount) kr)" -ForegroundColor Green
+    Write-Host "Opprettet: $outFile  ($quantity brukere, totalt $('{0:N0}' -f $totalAmount) kr)" -ForegroundColor Green
     $invoiceNumber++
 }
 #endregion
 
 Write-Host ""
-Write-Host "Done. $($byDepartment.Count) invoice(s) written to: $OutputFolder" -ForegroundColor Cyan
+Write-Host "Ferdig. $($byDepartment.Count) faktura(er) lagret i: $OutputFolder" -ForegroundColor Cyan
