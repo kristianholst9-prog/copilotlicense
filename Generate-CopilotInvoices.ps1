@@ -109,7 +109,9 @@ foreach ($dept in $byDepartment) {
     $outFile     = Join-Path $OutputFolder "$invNumStr`_$safeDept.xlsx"
 
     # ---- Bygg Excel-arbeidsbok ----
-    $xl = Open-ExcelPackage -Path $outFile -KillExcel
+    # Slett gammel fil hvis den finnes, og opprett en ny ExcelPackage
+    if (Test-Path $outFile) { Remove-Item $outFile -Force }
+    $xl = [OfficeOpenXml.ExcelPackage]::new()
 
     $ws = Add-Worksheet -ExcelPackage $xl -WorksheetName "Faktura"
 
@@ -200,7 +202,8 @@ foreach ($dept in $byDepartment) {
     # --- Frys øverste rader ---
     $ws.View.FreezePanes($tableStart + 1, 1)
 
-    Close-ExcelPackage $xl -Show:$false
+    $xl.SaveAs($outFile)
+    $xl.Dispose()
 
     Write-Host "Opprettet: $outFile  ($quantity brukere, totalt $('{0:N0}' -f $totalAmount) kr)" -ForegroundColor Green
     $invoiceNumber++
