@@ -19,25 +19,24 @@
     Invoice date. Defaults to today.
 
 .EXAMPLE
-    .\Generate-CopilotInvoices.ps1 -GroupName "Copilot-Licenses"
-    .\Generate-CopilotInvoices.ps1 -GroupName "Copilot-Licenses" -OutputFolder "C:\Invoices" -InvoiceNumberStart 1050
+    .\Generate-CopilotInvoices.ps1
+    .\Generate-CopilotInvoices.ps1 -InvoiceNumberStart 1050
 #>
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
-    [string]$GroupName,
+    [string]$GroupName           = "M365_LIC_Copilot_for_M365",
 
-    [string]$OutputFolder = ".\Invoices",
+    [string]$OutputFolder        = "C:\temp",
 
-    [int]$InvoiceNumberStart = 1001,
+    [int]$InvoiceNumberStart     = 1001,
 
-    [datetime]$InvoiceDate = (Get-Date),
+    [datetime]$InvoiceDate       = (Get-Date),
 
-    [string]$SellerName    = "Din Organisasjon AS",
-    [string]$SellerOrgNr   = "000 000 000",
-    [string]$Product        = "Microsoft 365 Copilot lisens",
-    [decimal]$PricePerUnit  = 3500
+    [string]$SellerName          = "Universitetet i Bergen",
+    [string]$SellerOrgNr         = "N/A",
+    [string]$Product             = "Microsoft 365 Copilot lisens",
+    [decimal]$PricePerUnit       = 3500
 )
 
 #region --- Dependency check ---
