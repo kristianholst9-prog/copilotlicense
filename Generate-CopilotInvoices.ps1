@@ -76,8 +76,12 @@ Write-Host "Fant $($members.Count) bruker(e)." -ForegroundColor Green
 #endregion
 
 #region --- Grupper etter avdeling ---
+# Grupper på de to første delene av avdelingskoden (f.eks. ADM-SA-P og ADM-SA-Q → ADM-SA)
 $byDepartment = $members | Group-Object {
-    if ($_.Department) { $_.Department.Trim() } else { "Ukjent" }
+    if ($_.Department) {
+        $parts = $_.Department.Trim() -split '-'
+        if ($parts.Count -ge 2) { "$($parts[0])-$($parts[1])" } else { $parts[0] }
+    } else { "Ukjent" }
 } | Sort-Object Name
 
 Write-Host "Antall avdelinger: $($byDepartment.Count)" -ForegroundColor Cyan
